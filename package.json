@@ -1,0 +1,44 @@
+{
+  "name": "@competiflow/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for Competiflow — track competitors and read change digests as tools in Cursor, Claude Desktop, and any MCP client",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "competiflow-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "competiflow",
+    "competitor-monitoring",
+    "mcp",
+    "model-context-protocol",
+    "cursor",
+    "claude",
+    "ai"
+  ],
+  "author": "Competiflow <hello@competiflow.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nyku/competiflow-mcp"
+  },
+  "homepage": "https://competiflow.com",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
