@@ -17,6 +17,8 @@ const API_KEY = process.env.COMPETIFLOW_API_KEY || "";
 const workspaceId = z.union([z.string(), z.number()]).describe("Workspace id from list_workspaces or create_workspace");
 const resourceId = z.union([z.string(), z.number()]);
 
+const monitorType = z.enum(["homepage", "blog", "docs", "changelog", "pricing"]);
+
 const includeCapture = z
   .array(z.enum(["capture", "capture_markdown", "raw_diff"]))
   .optional()
@@ -30,10 +32,10 @@ Typical flow:
 1. list_workspaces or create_workspace.
 2. add_competitor with a homepage URL. Discovery is async. Poll get_competitor until discovery_status is completed. If you get 409 discovery_in_progress, read active_competitor_id and poll that competitor.
 3. refresh_workspace or check_monitor to pull fresh data.
-4. list_changes with since and min_severity. Use meta.counts for inbox totals.
+4. list_changes with since and min_severity. Use meta.counts for inbox totals. Each change includes why_it_matters (competitive context), not recommended_action.
 5. get_change with include capture or raw_diff when you need evidence.
 6. update_change to triage (acknowledged or dismissed).
-7. get_digest for a weekly summary.
+7. get_digest for a weekly summary; needs_review.items include why_it_matters.
 
 add_competitor is idempotent on duplicate URLs. delete_monitor and delete_competitor remove history. Prefer update_monitor or update_competitor with status paused when you want to keep history.
 `.trim();
@@ -191,7 +193,7 @@ server.tool(
   {
     competitor_id: resourceId,
     url: z.string(),
-    monitor_type: z.string(),
+    monitor_type: monitorType,
     cadence: z.enum(["hourly", "six_hourly", "daily", "weekly"]).optional(),
   },
   async (params) => {
@@ -211,7 +213,7 @@ server.tool(
   {
     monitor_id: resourceId,
     url: z.string().optional(),
-    monitor_type: z.string().optional(),
+    monitor_type: monitorType.optional(),
     cadence: z.enum(["hourly", "six_hourly", "daily", "weekly"]).optional(),
     status: z.enum(["active", "paused"]).optional(),
     min_severity: z.enum(["info", "low", "medium", "high", "critical"]).optional(),
@@ -257,14 +259,14 @@ server.tool(
 
 server.tool(
   "list_changes",
-  "GET /v1/changes. Cursor-paginated change feed. Response includes meta.counts and max_unreviewed_severity.",
+  "GET /v1/changes. Cursor-paginated change feed. Each item includes summary, severity, why_it_matters, monitor_type, and review_status. Response includes meta.counts and max_unreviewed_severity.",
   {
     workspace_id: workspaceId,
     competitor_id: resourceId.optional(),
     min_severity: z.enum(["info", "low", "medium", "high", "critical"]).optional(),
     review_status: z.enum(["unreviewed", "acknowledged", "dismissed"]).optional(),
     since: z.string().optional().describe("ISO8601 or 1d, 7d, 30d"),
-    monitor_type: z.string().optional(),
+    monitor_type: monitorType.optional(),
     limit: z.number().optional().describe("1-100, default 25"),
     after: resourceId.optional().describe("Cursor from next_cursor"),
   },
@@ -285,7 +287,7 @@ server.tool(
 
 server.tool(
   "get_change",
-  "GET /v1/changes/:id. Full change detail. Pass include for capture, capture_markdown, or raw_diff evidence.",
+  "GET /v1/changes/:id. Full change detail with why_it_matters, field_diffs, and clusters. Pass include for capture, capture_markdown, or raw_diff evidence.",
   {
     change_id: resourceId,
     include: includeCapture,
@@ -314,7 +316,7 @@ server.tool(
 
 server.tool(
   "get_digest",
-  "GET /v1/workspaces/:id/digest. Weekly workspace summary with needs-review items and top opportunities.",
+  "GET /v1/workspaces/:id/digest. Workspace summary with needs_review items (why_it_matters, severity), activity map, and top opportunities.",
   {
     workspace_id: workspaceId,
     period: z.enum(["1d", "7d", "30d"]).optional(),

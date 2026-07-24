@@ -120,13 +120,14 @@ For a change the capture is the post-change page. For a monitor it is the latest
 ## Agent guidelines (for AI clients)
 
 - **Poll discovery, do not assume:** after `add_competitor`, poll `get_competitor` until `discovery_status` is `completed` before reading changes. On `409`, poll the `active_competitor_id` from the error.
-- **Filter the feed:** pass `since` (`1d`, `7d`, `30d`, or ISO8601), `min_severity`, `monitor_type`, and `review_status` to `list_changes` instead of pulling everything. Use `meta.counts` for inbox totals and `next_cursor` to page.
+- **Filter the feed:** pass `since` (`1d`, `7d`, `30d`, or ISO8601), `min_severity`, `monitor_type` (`homepage`, `blog`, `docs`, `changelog`, `pricing`), and `review_status` to `list_changes` instead of pulling everything. Use `meta.counts` for inbox totals and `next_cursor` to page.
+- **Interpretation fields:** changes and digest items expose `why_it_matters` for competitive context. `recommended_action` was removed from the API.
 - **Fetch evidence on demand:** only add `include` to `get_change` or `get_monitor` when you need the underlying capture. It adds payload.
 - **Prefer pause over delete:** default to `status: paused` when a user wants to stop a monitor. Reserve `delete_*` for permanent removal, since it drops history.
 
 ## How it works
 
-The server translates each tool call into a Competiflow v1 API request and returns structured JSON. Your agent sees interpreted changes, severity, and recommended actions instead of raw page scrapes.
+The server translates each tool call into a Competiflow v1 API request and returns structured JSON. Your agent sees interpreted changes, severity, and why it matters instead of raw page scrapes.
 
 ```
 AI Agent → MCP Tool Call → Competiflow API → Interpreted Change Feed → Structured Response → AI Agent
