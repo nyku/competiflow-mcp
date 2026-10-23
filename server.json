@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.nyku/competiflow-mcp",
+  "description": "Competitor monitoring for AI agents: track rival pricing, docs and changelog changes with evidence.",
+  "websiteUrl": "https://competiflow.com",
+  "repository": {
+    "url": "https://github.com/nyku/competiflow-mcp",
+    "source": "github"
+  },
+  "version": "0.1.2",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@competiflow/mcp-server",
+      "version": "0.1.2",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "COMPETIFLOW_API_KEY",
+          "description": "Your Competiflow API key (sk_live_...), created under API keys in the dashboard",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 {
   "name": "@competiflow/mcp-server",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for Competiflow — track competitors and read change digests as tools in Cursor, Claude Desktop, and any MCP client",
+  "mcpName": "io.github.nyku/competiflow-mcp",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {

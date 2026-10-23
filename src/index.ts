@@ -29,7 +29,7 @@ const MCP_AGENT_INSTRUCTIONS = `
 Competiflow watches competitor websites and returns interpreted changes.
 
 Typical flow:
-1. list_workspaces or create_workspace.
+1. list_workspaces or create_workspace (optional product_url improves why_it_matters).
 2. add_competitor with a homepage URL. Discovery is async. Poll get_competitor until discovery_status is completed. If you get 409 discovery_in_progress, read active_competitor_id and poll that competitor.
 3. refresh_workspace or check_monitor to pull fresh data.
 4. list_changes with since and min_severity. Use meta.counts for inbox totals. Each change includes why_it_matters (competitive context), not recommended_action.
@@ -97,9 +97,19 @@ server.tool(
 
 server.tool(
   "create_workspace",
-  "POST /v1/workspaces. Create a workspace for one product or market.",
-  { name: z.string().describe("Workspace name") },
-  async (params) => text(await apiRequest("POST", "/v1/workspaces", { name: params.name })),
+  "POST /v1/workspaces. Create a workspace for one product or market. Optional product_url improves why_it_matters on changes.",
+  {
+    name: z.string().describe("Workspace name"),
+    product_url: z
+      .string()
+      .nullish()
+      .describe("Optional product URL (e.g. example.com). Server normalizes scheme."),
+  },
+  async (params) => {
+    const body: Record<string, unknown> = { name: params.name };
+    if (params.product_url) body.product_url = params.product_url;
+    return text(await apiRequest("POST", "/v1/workspaces", body));
+  },
 );
 
 server.tool(

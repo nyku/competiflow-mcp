@@ -67,7 +67,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 | Tool | API | Description |
 | --- | --- | --- |
 | `list_workspaces` | `GET /v1/workspaces` | List workspaces with review counts |
-| `create_workspace` | `POST /v1/workspaces` | Create a workspace |
+| `create_workspace` | `POST /v1/workspaces` | Create a workspace (optional `product_url`) |
 | `add_competitor` | `POST /v1/workspaces/:id/competitors` | Add a competitor by homepage URL. Async discovery, idempotent on duplicate URL |
 | `list_competitors` | `GET /v1/workspaces/:id/competitors` | List competitors with monitors and `last_run` |
 | `get_competitor` | `GET /v1/competitors/:id` | Read one competitor |
@@ -87,7 +87,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 
 ## Typical flow
 
-1. `list_workspaces` or `create_workspace`.
+1. `list_workspaces` or `create_workspace` (optional `product_url` improves competitive context on changes).
 2. `add_competitor` with a homepage URL.
 3. `get_competitor` until `discovery_status` is `completed`.
 4. `refresh_workspace` or `check_monitor` to pull fresh data.
