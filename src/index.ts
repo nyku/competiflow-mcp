@@ -13,6 +13,8 @@ const PACKAGE_VERSION = (
 
 const BASE_URL = "https://api.competiflow.com";
 const API_KEY = process.env.COMPETIFLOW_API_KEY || "";
+const MISSING_API_KEY_MESSAGE =
+  "COMPETIFLOW_API_KEY is not set. Create an API key in the Competiflow dashboard under API keys and add it to this server's env.";
 
 const workspaceId = z.union([z.string(), z.number()]).describe("Workspace id from list_workspaces or create_workspace");
 const resourceId = z.union([z.string(), z.number()]);
@@ -51,6 +53,8 @@ async function apiRequest<T = Record<string, unknown>>(
   path: string,
   body?: Record<string, unknown>,
 ): Promise<T> {
+  if (!API_KEY) throw new Error(MISSING_API_KEY_MESSAGE);
+
   const response = await fetch(`${BASE_URL}${path}`, {
     method,
     headers: {
@@ -338,10 +342,9 @@ server.tool(
 );
 
 async function main() {
-  if (!API_KEY) {
-    console.error("COMPETIFLOW_API_KEY environment variable is required.");
-    process.exit(1);
-  }
+  // Start without a key so clients and directory inspectors can still list tools;
+  // each tool call reports the missing key instead.
+  if (!API_KEY) console.error(MISSING_API_KEY_MESSAGE);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

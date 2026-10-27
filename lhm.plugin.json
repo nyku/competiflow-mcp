@@ -1,0 +1,634 @@
+{
+  "author": "Competiflow",
+  "description": "Competitor monitoring for AI agents: track rival pricing, docs and changelog changes with evidence.",
+  "homepage": "https://competiflow.com",
+  "identifier": "nyku-competiflow-mcp",
+  "name": "Competiflow",
+  "prompts": [],
+  "resources": [],
+  "tags": [
+    "competiflow",
+    "competitor-monitoring",
+    "mcp",
+    "model-context-protocol",
+    "cursor",
+    "claude",
+    "ai"
+  ],
+  "tools": [
+    {
+      "name": "list_workspaces",
+      "description": "GET /v1/workspaces. List workspaces with needs_review_count and monitor totals.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "create_workspace",
+      "description": "POST /v1/workspaces. Create a workspace for one product or market. Optional product_url improves why_it_matters on changes.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Workspace name"
+          },
+          "product_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional product URL (e.g. example.com). Server normalizes scheme."
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "add_competitor",
+      "description": "POST /v1/workspaces/:id/competitors. Add a competitor by homepage URL. Idempotent on duplicate URLs. Returns 409 with active_competitor_id when another discovery is running.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Workspace id from list_workspaces or create_workspace"
+          },
+          "url": {
+            "type": "string",
+            "description": "Competitor homepage URL"
+          },
+          "monitor_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "blog",
+                "changelog",
+                "pricing",
+                "docs",
+                "homepage"
+              ]
+            },
+            "description": "Limit discovery to these surface types"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "url"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "list_competitors",
+      "description": "GET /v1/workspaces/:id/competitors. List competitors with discovery_status and nested monitors (includes last_run on each monitor).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Workspace id from list_workspaces or create_workspace"
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "get_competitor",
+      "description": "GET /v1/competitors/:id. Read one competitor with monitors and discovery fields.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "competitor_id": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Competitor id"
+          }
+        },
+        "required": [
+          "competitor_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "update_competitor",
+      "description": "PATCH /v1/competitors/:id. Set cadence or status on all monitors for this competitor.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "competitor_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "hourly",
+              "six_hourly",
+              "daily",
+              "weekly"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused"
+            ]
+          }
+        },
+        "required": [
+          "competitor_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "delete_competitor",
+      "description": "DELETE /v1/competitors/:id. Permanently removes the competitor, its monitors, snapshots, and changes.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "competitor_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          }
+        },
+        "required": [
+          "competitor_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "list_monitors",
+      "description": "GET /v1/monitors. List monitors in a workspace with health, cadence, and last_run.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Workspace id from list_workspaces or create_workspace"
+          },
+          "competitor_id": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Filter to one competitor"
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "get_monitor",
+      "description": "GET /v1/monitors/:id. Read one monitor. Pass include for capture or capture_markdown from the latest successful check.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "capture",
+                "capture_markdown",
+                "raw_diff"
+              ]
+            },
+            "description": "Optional evidence payloads for get_change or get_monitor"
+          }
+        },
+        "required": [
+          "monitor_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "create_monitor",
+      "description": "POST /v1/monitors. Add a manual monitor on a specific URL.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "competitor_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "monitor_type": {
+            "type": "string",
+            "enum": [
+              "homepage",
+              "blog",
+              "docs",
+              "changelog",
+              "pricing"
+            ]
+          },
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "hourly",
+              "six_hourly",
+              "daily",
+              "weekly"
+            ]
+          }
+        },
+        "required": [
+          "competitor_id",
+          "url",
+          "monitor_type"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "update_monitor",
+      "description": "PATCH /v1/monitors/:id. Update url, monitor_type, cadence, status, or min_severity. Use status paused to keep history.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "monitor_type": {
+            "type": "string",
+            "enum": [
+              "homepage",
+              "blog",
+              "docs",
+              "changelog",
+              "pricing"
+            ]
+          },
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "hourly",
+              "six_hourly",
+              "daily",
+              "weekly"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused"
+            ]
+          },
+          "min_severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          }
+        },
+        "required": [
+          "monitor_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "delete_monitor",
+      "description": "DELETE /v1/monitors/:id. Permanently removes the monitor and all its changes and snapshots.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          }
+        },
+        "required": [
+          "monitor_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "check_monitor",
+      "description": "POST /v1/monitors/:id/check. Queue an on-demand check for one monitor.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          }
+        },
+        "required": [
+          "monitor_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "refresh_workspace",
+      "description": "POST /v1/workspaces/:id/refresh. Queue checks for all active monitors, or one competitor when competitor_id is set.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Workspace id from list_workspaces or create_workspace"
+          },
+          "competitor_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "list_changes",
+      "description": "GET /v1/changes. Cursor-paginated change feed. Each item includes summary, severity, why_it_matters, monitor_type, and review_status. Response includes meta.counts and max_unreviewed_severity.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Workspace id from list_workspaces or create_workspace"
+          },
+          "competitor_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "min_severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "review_status": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "acknowledged",
+              "dismissed"
+            ]
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO8601 or 1d, 7d, 30d"
+          },
+          "monitor_type": {
+            "type": "string",
+            "enum": [
+              "homepage",
+              "blog",
+              "docs",
+              "changelog",
+              "pricing"
+            ]
+          },
+          "limit": {
+            "type": "number",
+            "description": "1-100, default 25"
+          },
+          "after": {
+            "$ref": "#/properties/competitor_id",
+            "description": "Cursor from next_cursor"
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "get_change",
+      "description": "GET /v1/changes/:id. Full change detail with why_it_matters, field_diffs, and clusters. Pass include for capture, capture_markdown, or raw_diff evidence.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "change_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "capture",
+                "capture_markdown",
+                "raw_diff"
+              ]
+            },
+            "description": "Optional evidence payloads for get_change or get_monitor"
+          }
+        },
+        "required": [
+          "change_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "update_change",
+      "description": "PATCH /v1/changes/:id. Set review_status to unreviewed, acknowledged, or dismissed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "change_id": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "review_status": {
+            "type": "string",
+            "enum": [
+              "unreviewed",
+              "acknowledged",
+              "dismissed"
+            ]
+          }
+        },
+        "required": [
+          "change_id",
+          "review_status"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "get_digest",
+      "description": "GET /v1/workspaces/:id/digest. Workspace summary with needs_review items (why_it_matters, severity), activity map, and top opportunities.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Workspace id from list_workspaces or create_workspace"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "1d",
+              "7d",
+              "30d"
+            ]
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    }
+  ],
+  "version": "0.1.3"
+}
