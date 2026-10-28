@@ -68,6 +68,8 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 | --- | --- | --- |
 | `list_workspaces` | `GET /v1/workspaces` | List workspaces with review counts |
 | `create_workspace` | `POST /v1/workspaces` | Create a workspace (optional `product_url`) |
+| `update_workspace` | `PATCH /v1/workspaces/:id` | Rename, set or clear `product_url`, or pause/resume every monitor |
+| `delete_workspace` | `DELETE /v1/workspaces/:id` | Remove a workspace and all its history |
 | `add_competitor` | `POST /v1/workspaces/:id/competitors` | Add a competitor by homepage URL. Async discovery, idempotent on duplicate URL |
 | `list_competitors` | `GET /v1/workspaces/:id/competitors` | List competitors with monitors and `last_run` |
 | `get_competitor` | `GET /v1/competitors/:id` | Read one competitor |
@@ -84,6 +86,25 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 | `get_change` | `GET /v1/changes/:id` | Full change. Pass `include` for capture or raw diff |
 | `update_change` | `PATCH /v1/changes/:id` | Set `review_status` |
 | `get_digest` | `GET /v1/workspaces/:id/digest` | Weekly workspace summary |
+
+Every tool declares MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), so clients can ask before running the `delete_*` tools.
+
+## Prompts
+
+| Prompt | Arguments | What it does |
+| --- | --- | --- |
+| `weekly_briefing` | `workspace_id?`, `period?` | Summarizes competitor activity for a period, most important first |
+| `triage_changes` | `workspace_id?`, `min_severity?` | Walks the unreviewed inbox and proposes acknowledge or dismiss, then asks before updating |
+| `track_competitor` | `url`, `workspace_id?` | Adds a competitor, waits for discovery, and reports what is monitored |
+
+Without `workspace_id`, each prompt starts with `list_workspaces`.
+
+## Resources
+
+| URI | Type | Contents |
+| --- | --- | --- |
+| `competiflow://guide` | `text/markdown` | Agent guide: the typical flow, discovery, evidence, and delete versus pause |
+| `competiflow://workspaces/{workspace_id}/digest` | `application/json` | 7-day digest of one workspace. Clients that list resources show one per workspace. |
 
 ## Typical flow
 
@@ -115,7 +136,9 @@ For a change the capture is the post-change page. For a monitor it is the latest
 
 ## Delete versus pause
 
-`delete_monitor` and `delete_competitor` are permanent. They remove the monitor or competitor along with its check runs, snapshots, and changes. To stop checks while keeping intel history, call `update_monitor` or `update_competitor` with `status: paused` instead.
+`delete_monitor`, `delete_competitor`, and `delete_workspace` are permanent. They remove the record along with its check runs, snapshots, and changes. To stop checks while keeping intel history, call `update_monitor`, `update_competitor`, or `update_workspace` with `status: paused` instead.
+
+`delete_workspace` returns `409 discovery_in_progress` while a competitor in the workspace is still being discovered.
 
 ## Agent guidelines (for AI clients)
 
@@ -150,6 +173,8 @@ npm install
 npm run build
 COMPETIFLOW_API_KEY=sk_live_... node dist/index.js
 ```
+
+`npm test` builds and runs a smoke test that starts the server without a key, the way directory scanners do, and checks the tools, annotations, prompts, and resources.
 
 ## License
 

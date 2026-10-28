@@ -1,6 +1,6 @@
 {
   "name": "@competiflow/mcp-server",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "MCP server for Competiflow — track competitors and read change digests as tools in Cursor, Claude Desktop, and any MCP client",
   "mcpName": "io.github.nyku/competiflow-mcp",
   "main": "./dist/index.js",
@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "test": "npm run build && node test/smoke.mjs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

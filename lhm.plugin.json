@@ -4,8 +4,75 @@
   "homepage": "https://competiflow.com",
   "identifier": "nyku-competiflow-mcp",
   "name": "Competiflow",
-  "prompts": [],
-  "resources": [],
+  "prompts": [
+    {
+      "name": "weekly_briefing",
+      "title": "Competitor briefing",
+      "description": "Summarize what competitors changed in a workspace over a period, most important first.",
+      "arguments": [
+        {
+          "name": "workspace_id",
+          "description": "Workspace id. Omit to pick from list_workspaces.",
+          "required": false
+        },
+        {
+          "name": "period",
+          "description": "1d, 7d, or 30d (default 7d)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "triage_changes",
+      "title": "Triage changes",
+      "description": "Walk the unreviewed change inbox and propose acknowledge or dismiss for each change.",
+      "arguments": [
+        {
+          "name": "workspace_id",
+          "description": "Workspace id. Omit to pick from list_workspaces.",
+          "required": false
+        },
+        {
+          "name": "min_severity",
+          "description": "info, low, medium, high, or critical (default medium)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "track_competitor",
+      "title": "Track a competitor",
+      "description": "Add a competitor by URL, wait for discovery, and report which pages are monitored.",
+      "arguments": [
+        {
+          "name": "url",
+          "description": "Competitor homepage URL, e.g. https://rival.com",
+          "required": true
+        },
+        {
+          "name": "workspace_id",
+          "description": "Workspace id. Omit to pick from list_workspaces.",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "name": "guide",
+      "title": "Competiflow agent guide",
+      "uri": "competiflow://guide",
+      "description": "How to use the Competiflow tools: the typical flow, async discovery, evidence, triage, and delete versus pause.",
+      "mimeType": "text/markdown"
+    },
+    {
+      "name": "workspace_digest",
+      "title": "Workspace digest",
+      "uriTemplate": "competiflow://workspaces/{workspace_id}/digest",
+      "description": "7-day digest of one workspace: changes needing review with why_it_matters, activity by competitor, and top opportunities.",
+      "mimeType": "application/json"
+    }
+  ],
   "tags": [
     "competiflow",
     "competitor-monitoring",
@@ -18,11 +85,15 @@
   "tools": [
     {
       "name": "list_workspaces",
-      "description": "GET /v1/workspaces. List workspaces with needs_review_count and monitor totals.",
+      "title": "List workspaces",
+      "description": "List all your workspaces with competitor and monitor counts, needs_review_count, and the highest unreviewed severity. Start here to find a workspace_id. For one workspace's recent activity, use get_digest.",
       "inputSchema": {
         "type": "object",
-        "properties": {},
-        "$schema": "http://json-schema.org/draft-07/schema#"
+        "properties": {}
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
       },
       "execution": {
         "taskSupport": "forbidden"
@@ -30,20 +101,21 @@
     },
     {
       "name": "create_workspace",
-      "description": "POST /v1/workspaces. Create a workspace for one product or market. Optional product_url improves why_it_matters on changes.",
+      "title": "Create workspace",
+      "description": "Create a workspace for one product or market. Set product_url to your own product so why_it_matters explains each change relative to it. Returns 422 when your plan's workspace limit is reached. To rename or change an existing workspace, use update_workspace.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "name": {
             "type": "string",
-            "description": "Workspace name"
+            "description": "Workspace name, e.g. the product or market it covers"
           },
           "product_url": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Optional product URL (e.g. example.com). Server normalizes scheme."
+            "description": "Your own product's URL (e.g. example.com). The server adds https:// when missing."
           }
         },
         "required": [
@@ -52,13 +124,101 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "update_workspace",
+      "title": "Update workspace",
+      "description": "Rename a workspace, set or clear its product_url, or pause/resume every monitor in it. Send only the fields to change; nothing is written if any field is invalid. Pausing keeps all history, so prefer it over delete_workspace. To pause one competitor, use update_competitor.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Workspace id from list_workspaces or create_workspace"
+          },
+          "name": {
+            "type": "string",
+            "description": "New workspace name. Cannot be blank."
+          },
+          "product_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Your own product's URL (e.g. example.com). Pass null to clear it; omit to leave it unchanged."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused"
+            ],
+            "description": "paused stops checks on every monitor in the workspace; active resumes them"
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "delete_workspace",
+      "title": "Delete workspace",
+      "description": "Permanently delete a workspace with all its competitors, monitors, snapshots, and changes. Cannot be undone. Returns 409 discovery_in_progress while a competitor is still being discovered. To stop checks and keep history, use update_workspace with status paused.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "Workspace id from list_workspaces or create_workspace"
+          }
+        },
+        "required": [
+          "workspace_id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "add_competitor",
-      "description": "POST /v1/workspaces/:id/competitors. Add a competitor by homepage URL. Idempotent on duplicate URLs. Returns 409 with active_competitor_id when another discovery is running.",
+      "title": "Add competitor",
+      "description": "Add a competitor to a workspace by homepage URL and start discovering its pricing, docs, blog, and changelog pages. Discovery is async: poll get_competitor until discovery_status is completed. Re-adding the same URL returns the existing competitor. Returns 409 with active_competitor_id while another discovery runs in the workspace. To watch one specific page, use create_monitor.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -71,7 +231,7 @@
           },
           "url": {
             "type": "string",
-            "description": "Competitor homepage URL"
+            "description": "Competitor homepage URL, e.g. https://rival.com"
           },
           "monitor_types": {
             "type": "array",
@@ -85,7 +245,7 @@
                 "homepage"
               ]
             },
-            "description": "Limit discovery to these surface types"
+            "description": "Only discover these page types. Omit to discover all of them."
           }
         },
         "required": [
@@ -95,13 +255,20 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "list_competitors",
-      "description": "GET /v1/workspaces/:id/competitors. List competitors with discovery_status and nested monitors (includes last_run on each monitor).",
+      "title": "List competitors",
+      "description": "List the competitors in a workspace with discovery_status and their monitors, each with last_run. Use it for an overview of what is tracked. To list monitors alone or filter them by competitor, use list_monitors.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -119,13 +286,18 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "get_competitor",
-      "description": "GET /v1/competitors/:id. Read one competitor with monitors and discovery fields.",
+      "title": "Get competitor",
+      "description": "Get one competitor with its monitors and discovery fields. Use it to poll discovery after add_competitor until discovery_status is completed or failed.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -134,7 +306,7 @@
               "string",
               "number"
             ],
-            "description": "Competitor id"
+            "description": "Competitor id from list_competitors or add_competitor"
           }
         },
         "required": [
@@ -143,13 +315,18 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "update_competitor",
-      "description": "PATCH /v1/competitors/:id. Set cadence or status on all monitors for this competitor.",
+      "title": "Update competitor",
+      "description": "Set the check cadence or pause/resume every monitor of one competitor. History is kept. To change a single monitor, use update_monitor; for a whole workspace, use update_workspace.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -157,7 +334,8 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Competitor id from list_competitors or add_competitor"
           },
           "cadence": {
             "type": "string",
@@ -166,14 +344,16 @@
               "six_hourly",
               "daily",
               "weekly"
-            ]
+            ],
+            "description": "Check frequency. Faster cadences use more monthly checks; plans set a minimum (422 cadence_not_allowed)."
           },
           "status": {
             "type": "string",
             "enum": [
               "active",
               "paused"
-            ]
+            ],
+            "description": "active runs checks; paused stops checks and keeps history"
           }
         },
         "required": [
@@ -181,6 +361,12 @@
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
       },
       "execution": {
         "taskSupport": "forbidden"
@@ -188,7 +374,8 @@
     },
     {
       "name": "delete_competitor",
-      "description": "DELETE /v1/competitors/:id. Permanently removes the competitor, its monitors, snapshots, and changes.",
+      "title": "Delete competitor",
+      "description": "Permanently delete a competitor with its monitors, snapshots, and changes. Cannot be undone. To stop checks and keep history, use update_competitor with status paused.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -196,7 +383,8 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Competitor id from list_competitors or add_competitor"
           }
         },
         "required": [
@@ -205,13 +393,20 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "list_monitors",
-      "description": "GET /v1/monitors. List monitors in a workspace with health, cadence, and last_run.",
+      "title": "List monitors",
+      "description": "List the monitors in a workspace, optionally for one competitor, with URL, type, cadence, status, health, and last_run. Use it to find a monitor_id or spot failing monitors. For competitors with their monitors nested, use list_competitors.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -227,7 +422,7 @@
               "string",
               "number"
             ],
-            "description": "Filter to one competitor"
+            "description": "Only list this competitor's monitors"
           }
         },
         "required": [
@@ -236,13 +431,18 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "get_monitor",
-      "description": "GET /v1/monitors/:id. Read one monitor. Pass include for capture or capture_markdown from the latest successful check.",
+      "title": "Get monitor",
+      "description": "Get one monitor's settings, health, and last run. Set include to also return the latest successful capture as structured data or markdown.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -250,7 +450,8 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Monitor id from list_monitors or list_competitors"
           },
           "include": {
             "type": "array",
@@ -262,7 +463,7 @@
                 "raw_diff"
               ]
             },
-            "description": "Optional evidence payloads for get_change or get_monitor"
+            "description": "Evidence to add: capture (structured page data), capture_markdown (page as markdown), raw_diff"
           }
         },
         "required": [
@@ -271,13 +472,18 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "create_monitor",
-      "description": "POST /v1/monitors. Add a manual monitor on a specific URL.",
+      "title": "Create monitor",
+      "description": "Watch one specific page of an existing competitor, such as a pricing or docs URL that discovery missed. To add a new competitor and discover its pages automatically, use add_competitor.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -285,10 +491,12 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Competitor id from list_competitors or add_competitor"
           },
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "Full URL of the page to watch"
           },
           "monitor_type": {
             "type": "string",
@@ -298,7 +506,8 @@
               "docs",
               "changelog",
               "pricing"
-            ]
+            ],
+            "description": "Kind of page: homepage, blog, docs, changelog, or pricing"
           },
           "cadence": {
             "type": "string",
@@ -307,7 +516,8 @@
               "six_hourly",
               "daily",
               "weekly"
-            ]
+            ],
+            "description": "Check frequency. Faster cadences use more monthly checks; plans set a minimum (422 cadence_not_allowed)."
           }
         },
         "required": [
@@ -318,13 +528,20 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "update_monitor",
-      "description": "PATCH /v1/monitors/:id. Update url, monitor_type, cadence, status, or min_severity. Use status paused to keep history.",
+      "title": "Update monitor",
+      "description": "Change one monitor's URL, type, cadence, status, or min_severity. Use status paused to stop checks and keep history. To change every monitor of a competitor at once, use update_competitor.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -332,10 +549,12 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Monitor id from list_monitors or list_competitors"
           },
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "New URL to watch"
           },
           "monitor_type": {
             "type": "string",
@@ -345,7 +564,8 @@
               "docs",
               "changelog",
               "pricing"
-            ]
+            ],
+            "description": "Kind of page: homepage, blog, docs, changelog, or pricing"
           },
           "cadence": {
             "type": "string",
@@ -354,14 +574,16 @@
               "six_hourly",
               "daily",
               "weekly"
-            ]
+            ],
+            "description": "Check frequency. Faster cadences use more monthly checks; plans set a minimum (422 cadence_not_allowed)."
           },
           "status": {
             "type": "string",
             "enum": [
               "active",
               "paused"
-            ]
+            ],
+            "description": "active runs checks; paused stops checks and keeps history"
           },
           "min_severity": {
             "type": "string",
@@ -371,7 +593,8 @@
               "medium",
               "high",
               "critical"
-            ]
+            ],
+            "description": "Changes below this severity are not reported"
           }
         },
         "required": [
@@ -379,6 +602,12 @@
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
       },
       "execution": {
         "taskSupport": "forbidden"
@@ -386,7 +615,8 @@
     },
     {
       "name": "delete_monitor",
-      "description": "DELETE /v1/monitors/:id. Permanently removes the monitor and all its changes and snapshots.",
+      "title": "Delete monitor",
+      "description": "Permanently delete one monitor with its snapshots and changes. Cannot be undone. To stop checks and keep history, use update_monitor with status paused.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -394,7 +624,8 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Monitor id from list_monitors or list_competitors"
           }
         },
         "required": [
@@ -402,6 +633,12 @@
         ],
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
       },
       "execution": {
         "taskSupport": "forbidden"
@@ -409,7 +646,8 @@
     },
     {
       "name": "check_monitor",
-      "description": "POST /v1/monitors/:id/check. Queue an on-demand check for one monitor.",
+      "title": "Check monitor now",
+      "description": "Queue an immediate check of one monitor. Uses one of your monthly checks and returns 429 refresh_throttled if the monitor was checked too recently. Results arrive asynchronously: read them later with list_changes or get_monitor. To check every monitor in a workspace, use refresh_workspace.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -417,7 +655,8 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Monitor id from list_monitors or list_competitors"
           }
         },
         "required": [
@@ -426,13 +665,20 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "refresh_workspace",
-      "description": "POST /v1/workspaces/:id/refresh. Queue checks for all active monitors, or one competitor when competitor_id is set.",
+      "title": "Refresh workspace",
+      "description": "Queue immediate checks for every active monitor in a workspace, or for one competitor when competitor_id is set. Each monitor checked uses one monthly check; recently checked monitors are skipped and listed in skipped_ids. Returns 409 while discovery is running. For a single monitor, use check_monitor.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -447,7 +693,8 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Only refresh this competitor's monitors"
           }
         },
         "required": [
@@ -456,13 +703,20 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "list_changes",
-      "description": "GET /v1/changes. Cursor-paginated change feed. Each item includes summary, severity, why_it_matters, monitor_type, and review_status. Response includes meta.counts and max_unreviewed_severity.",
+      "title": "List changes",
+      "description": "List detected competitor changes in a workspace, newest first, with summary, severity, why_it_matters, monitor_type, and review_status. meta.counts gives inbox totals; page with after set to next_cursor. For a summarized period, use get_digest; for evidence on one change, use get_change.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -477,7 +731,8 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Only this competitor's changes"
           },
           "min_severity": {
             "type": "string",
@@ -487,7 +742,8 @@
               "medium",
               "high",
               "critical"
-            ]
+            ],
+            "description": "Lowest severity to include"
           },
           "review_status": {
             "type": "string",
@@ -495,11 +751,12 @@
               "unreviewed",
               "acknowledged",
               "dismissed"
-            ]
+            ],
+            "description": "unreviewed (in the inbox), acknowledged (seen and relevant), or dismissed (noise)"
           },
           "since": {
             "type": "string",
-            "description": "ISO8601 or 1d, 7d, 30d"
+            "description": "ISO 8601 timestamp, or a relative window: 1d, 7d, 30d"
           },
           "monitor_type": {
             "type": "string",
@@ -509,15 +766,19 @@
               "docs",
               "changelog",
               "pricing"
-            ]
+            ],
+            "description": "Kind of page: homepage, blog, docs, changelog, or pricing"
           },
           "limit": {
             "type": "number",
-            "description": "1-100, default 25"
+            "description": "Page size, 1-100 (default 25)"
           },
           "after": {
-            "$ref": "#/properties/competitor_id",
-            "description": "Cursor from next_cursor"
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "next_cursor from the previous page"
           }
         },
         "required": [
@@ -526,13 +787,18 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "get_change",
-      "description": "GET /v1/changes/:id. Full change detail with why_it_matters, field_diffs, and clusters. Pass include for capture, capture_markdown, or raw_diff evidence.",
+      "title": "Get change",
+      "description": "Get one change with why_it_matters, field-level diffs, and related clusters. Set include to add the captured page or the raw diff as evidence.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -540,7 +806,8 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Change id from list_changes or get_digest"
           },
           "include": {
             "type": "array",
@@ -552,7 +819,7 @@
                 "raw_diff"
               ]
             },
-            "description": "Optional evidence payloads for get_change or get_monitor"
+            "description": "Evidence to add: capture (structured page data), capture_markdown (page as markdown), raw_diff"
           }
         },
         "required": [
@@ -561,13 +828,18 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "update_change",
-      "description": "PATCH /v1/changes/:id. Set review_status to unreviewed, acknowledged, or dismissed.",
+      "title": "Triage change",
+      "description": "Triage a change by setting its review_status: acknowledged when it is relevant, dismissed when it is noise, or unreviewed to put it back in the inbox.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -575,7 +847,8 @@
             "type": [
               "string",
               "number"
-            ]
+            ],
+            "description": "Change id from list_changes or get_digest"
           },
           "review_status": {
             "type": "string",
@@ -583,7 +856,8 @@
               "unreviewed",
               "acknowledged",
               "dismissed"
-            ]
+            ],
+            "description": "unreviewed (in the inbox), acknowledged (seen and relevant), or dismissed (noise)"
           }
         },
         "required": [
@@ -593,13 +867,20 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     },
     {
       "name": "get_digest",
-      "description": "GET /v1/workspaces/:id/digest. Workspace summary with needs_review items (why_it_matters, severity), activity map, and top opportunities.",
+      "title": "Get workspace digest",
+      "description": "Get a workspace summary for a period: changes needing review with why_it_matters, an activity map by competitor, and top opportunities. Use it for briefings; to page through individual changes, use list_changes.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -616,7 +897,8 @@
               "1d",
               "7d",
               "30d"
-            ]
+            ],
+            "description": "Time window to summarize (default 7d)"
           }
         },
         "required": [
@@ -625,10 +907,15 @@
         "additionalProperties": false,
         "$schema": "http://json-schema.org/draft-07/schema#"
       },
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
       "execution": {
         "taskSupport": "forbidden"
       }
     }
   ],
-  "version": "0.1.3"
+  "version": "0.2.0",
+  "icon": "https://competiflow.com/logo.png"
 }
